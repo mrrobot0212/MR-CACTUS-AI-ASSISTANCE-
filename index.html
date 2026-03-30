@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cuctus AI Assistant</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+<div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Cuctus AI Assistant</h1>
+    <div id="chat" class="h-64 overflow-y-auto border rounded p-2 mb-4 bg-gray-50"></div>
+
+    <div class="flex gap-2">
+        <input id="userInput" type="text" placeholder="Say something..." class="flex-1 border rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <button id="sendBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Send</button>
+        <button id="voiceBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">🎤</button>
+    </div>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("userInput");
+const sendBtn = document.getElementById("sendBtn");
+const voiceBtn = document.getElementById("voiceBtn");
+
+// ===== Text-to-Speech =====
+function speak(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    speechSynthesis.speak(utterance);
+}
+
+// ===== Add message to chat =====
+function addMessage(sender, text) {
+    const div = document.createElement("div");
+    div.className = sender === "user" ? "text-right mb-2" : "text-left mb-2";
+    div.innerHTML = `<span class="inline-block px-3 py-2 rounded-xl ${sender === "user" ? 'bg-blue-500 text-white' : 'bg-gray-300'}">${text}</span>`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+// ===== Send message to Flask =====
+async function sendMessage() {
+    const message = input.value.trim();
+    if(!message) return;
+    addMessage("user", message);
+    input.value = "";
+
+    try {
+        const res = await fetch("/ask", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({message})
+        });
+        const data = await res.json();
+        const answer = data.answer;
+        addMessage("ai", answer);
+        speak(answer);
+    } catch (err) {
+        addMessage("ai", "Sorry, something went wrong!");
+        console.error(err);
+    }
+}
+
+sendBtn.addEventListener("click", sendMessage);
+input.addEventListener("keypress", (e) => { if(e.key === "Enter") sendMessage(); });
+
+// ===== Voice Recognition =====
+voiceBtn.addEventListener("click", async () => {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = "en-US";
+    recognition.start();
+    recognition.onresult = async (event) => {
+        const speech = event.results[0][0].transcript;
+        input.value = speech;
+        await sendMessage();
+    };
+});
+</script>
+
+</body>
+</html>
